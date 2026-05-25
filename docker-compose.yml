@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  nginx_jira_worklogs:
+    image: nginx:alpine
+    container_name: nginx_jira_worklogs
+    ports:
+      - "11111:80"
+    volumes:
+      - './app/:/var/www/html'
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - nginx_jira_php
+
+  nginx_jira_php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nginx_jira_php
+    volumes:
+      - './app/:/var/www/html'
+    environment:
+      - APP_ENV=dev

@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        {% include 'layout/head.html.twig' %}
+        <link rel="icon" type="image/x-icon" href="{{ asset('app/images/jira-logo.png') }}" />
+    </head>
+    <body>
+        <div class="loader-overlay" style="display: none;"></div>
+        {% block content %}{% endblock %}
+    </body>
+</html>

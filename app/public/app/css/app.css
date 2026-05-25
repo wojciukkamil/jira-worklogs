@@ -1,0 +1,55 @@
+.wrapper {
+    display: flex;
+    justify-content: center;
+}
+
+.container {
+    /* width: 80%; */
+}
+
+.main-panel {
+    width: 80%;
+}
+
+.main-header {
+    width: 80%;
+    /* background: #5c55bf !important; */
+}
+
+.navbar .navbar-nav .topbar-user .profile-pic {
+    color: white;
+}
+
+.text-bg-my a, .text-bg-my a:hover {
+    color: rgb(255, 255, 255) !important;
+}
+
+.text-bg-my a:hover {
+    color: #5c55bf !important;
+}
+
+/* .fc-toolbar .fc-button {
+    color: red;
+    background: blue;
+} */
+
+/* .fc-timegrid-event-harness > .fc-timegrid-event {
+  inset: 0px;
+  position: absolute;
+} */
+
+.fc-event {
+    /* color: #5c55bf !important; */
+}
+
+.fc-button {
+    background-color: red;
+}
+
+.fc-day {
+    /* color: white; */
+}
+
+.spent-time {
+    float: right;
+}

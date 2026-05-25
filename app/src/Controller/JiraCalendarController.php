@@ -1,0 +1,106 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Controller;
+
+use App\Event\SetDataEvent;
+use App\Exception\CalendarExceptionInterface;
+use App\Request\RequestParserInterface;
+use App\Serializer\SerializerInterface;
+use App\Service\JiraApiClient;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Component\Routing\Attribute\Route;
+
+#[Route('/jira-calendar', name: 'jira_calendar_')]
+class JiraCalendarController
+{
+    public function __construct(
+        private readonly JiraApiClient $jiraApiClient,
+        private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly SerializerInterface $serializer,
+        private readonly RequestParserInterface $requestParser,
+        private readonly int $cacheMaxAge = 0,
+    ) {}
+
+    #[Route('/load', name: 'load', methods: ['POST'])]
+    public function load(Request $request): JsonResponse
+    {
+        try {
+            $params = $this->requestParser->parse($request);
+        } catch (CalendarExceptionInterface $e) {
+            throw new BadRequestHttpException($e->getMessage(), $e);
+        }
+
+        $setDataEvent = $this->eventDispatcher->dispatch(
+            new SetDataEvent($params->start, $params->end, $params->filters),
+        );
+
+        $content = $this->serializer->serialize($setDataEvent->getEvents());
+
+        if ('' === $content) {
+            $response = new JsonResponse();
+            $response->setStatusCode(Response::HTTP_NO_CONTENT);
+
+            return $response;
+        }
+
+        $response = JsonResponse::fromJsonString($content);
+
+        // if ($this->cacheMaxAge > 0) {
+        //     $response->setETag(hash('xxh3', $content));
+        //     $response->setPublic();
+        //     $response->setMaxAge($this->cacheMaxAge);
+        // }
+// var_dump($response);die;
+        return $response;
+    }
+
+    #[Route('/event/{issueIdOrKey}/{worklogId}', name: 'event', methods: ['GET'])]
+    public function preview(Request $request, int $issueIdOrKey, int $worklogId): JsonResponse
+    {
+            $result = $this->jiraApiClient
+            ->setRequestMethod('GET')
+            ->setMethodName('worklog/:worklogId')
+            ->setMethodParams([
+                // ':issueIdOrKey' => $issueIdOrKey,
+                ':worklogId' => $worklogId,
+            ])
+            ->execute();
+        var_dump($result);die;
+        return new JsonResponse($result);
+        // var_dump($id);die;
+        try {
+            $params = $this->requestParser->parse($request);
+        } catch (CalendarExceptionInterface $e) {
+            throw new BadRequestHttpException($e->getMessage(), $e);
+        }
+
+        $setDataEvent = $this->eventDispatcher->dispatch(
+            new SetDataEvent($params->start, $params->end, $params->filters),
+        );
+
+        $content = $this->serializer->serialize($setDataEvent->getEvents());
+
+        if ('' === $content) {
+            $response = new JsonResponse();
+            $response->setStatusCode(Response::HTTP_NO_CONTENT);
+
+            return $response;
+        }
+
+        $response = JsonResponse::fromJsonString($content);
+
+        // if ($this->cacheMaxAge > 0) {
+        //     $response->setETag(hash('xxh3', $content));
+        //     $response->setPublic();
+        //     $response->setMaxAge($this->cacheMaxAge);
+        // }
+// var_dump($response);die;
+        return $response;
+    }
+}

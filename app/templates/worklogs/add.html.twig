@@ -1,0 +1,92 @@
+<form action="/worklogs/add" method="get" id="worklogFormAdd">
+	{# <div class="input-group input-group-lg">
+			        <span class="input-group-text" id="inputGroup-sizing-lg">Jira task: </span> #}
+	{# <input type="text" class="form-control" aria-label="Sizing example input" aria-describedby="inputGroup-sizing-lg" value="{{ issue.key }}" disabled readonly> #}
+	{# </div>
+				<div class="mb-3">
+					<label for="message-text" class="col-form-label"></label>
+					<textarea class="form-control" id="message-text" disabled readonly></textarea>
+				</div> #}
+	{# <div class="mb-3">
+					<label for="recipient-name" class="col-form-label">Zadanie:</label>
+					<input type="text" class="form-control" id="recipient-name" value="{{ issue.key }}" disabled readonly>
+				</div> #}
+		{# <div class="mb-3"> #}
+{# <div class="container mt-5">
+    <select class="form-select" id="ajaxSelect" name="data" style="width: 100%;">
+        <option value="">Wyszukaj...</option>
+    </select>
+</div> #}
+{# </select> #}
+
+    <div class="mt-3">
+		<label for="recipient-name" class="col-form-label">Jira task:</label>
+        <select class="form-select" id="ajaxSelect" name="worklog_add_form_issue_key" style="width: 100%;" required>
+            <option value="">Wyszukaj...</option>
+        </select>
+    </div>
+
+	</div>
+	<div class="mb-3">
+		<label for="recipient-name" class="col-form-label">Data rozpoczęcia:</label>
+		<input type="datetime-local" class="form-control" id="recipient-name" value="{{ start }}" name="worklog_add_form_start" id="worklog_form_start">
+	</div>
+	<div class="mb-3">
+		<label for="recipient-name" class="col-form-label">Czas pracy:</label>
+		<input type="text" class="form-control" id="recipient-name" value="{{ timeSpent }}" name="worklog_add_form_time_spent" id="worklog_form_time_spent">
+	</div>
+	<div class="mb-3">
+		<label for="message-text" class="col-form-label">Opis pracy:</label>
+		<textarea class="form-control" id="worklog_form_message" name="worklog_add_form_message">{{ message }}</textarea>
+	</div>
+
+	{# <input type="hidden" name="issue_key" value="{{ issue.key }}"/> #}
+	{# <input type="hidden" name="worklog_id" value="{{ worklog.id }}"/> #}
+</form>
+
+<script>
+    $(document).ready(function() {
+       $('#ajaxSelect').select2({
+
+        dropdownParent: '#addEventModal', // Ustawienie rodzica dropdownu na modal
+
+        allowClear: true,
+         theme: 'bootstrap-5', // Motyw Bootstrap 5
+         placeholder: 'Wpisz szukaną frazę',
+         minimumInputLength: 2, // Minimalna liczba znaków do rozpoczęcia wyszukiwania
+         ajax: {
+             url: '/worklogs/search', // URL do skryptu AJAX
+             dataType: 'json',
+             delay: 250, // Opóźnienie przed wysłaniem zapytania
+             data: function (params) {
+                 return {
+                     search: params.term // Fraza wyszukiwania
+                 };
+             },
+             processResults: function (data) {
+                 return {
+                     results: $.map(data, function (item) {
+                         return {
+                             text: item.name, // Co wyświetlić
+                             id: item.key // Co pobrać
+                         }
+                     })
+                 };
+             },
+             cache: true
+         }
+     });
+
+    });
+</script>
+
+<style>
+    .select2-container--bootstrap-5 .select2-selection--single {
+        height: 38px; /* Dopasuj do wysokości inputa */
+        padding: 6px 12px; /* Dopasuj do paddingu inputa */
+    }
+
+    .select2-selection__clear {
+        color:rgb(125, 108, 108); /* Kolor ikony "x" */
+    }
+</style>

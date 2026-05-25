@@ -1,0 +1,52 @@
+/* Kolor tła dla soboty */
+.fc-day-sat {
+  background-color: #f0f8ff;
+  color: #888a85;
+}
+
+/* Kolor tła dla niedzieli */
+.fc-day-sun {
+  background-color: #f9f0ff;
+  color: red;
+}
+
+.issue-item-avatar {
+  width: 14px;
+}
+
+.fc-event-main {
+  overflow-wrap: break-word;
+  /* Dzieli bardzo długie słowa, np. adresy URL */
+  word-break: break-word;
+  /* /*   white-space: nowrap;      /* Wymusza wyświetlanie w jednej linii  */
+  overflow: hidden;          /* Ukrywa tekst, który wychodzi poza div */
+  text-overflow: ellipsis;
+  /* Dodaje trzy kropki (...) w miejscu ucięcia
+  /* z-index: 0px !important; */
+}
+
+.fc-timegrid-event .fc-event-main {
+  padding: 0px 0px 0px;
+  z-index: none;
+}
+
+.event-desc {
+  padding: 2px;
+}
+
+span.spent-time {
+  font-size: 10px;
+  border: none;
+  margin: 1px;
+  padding: 3px 3px 3px;
+  color: var(--fc-button-bg-color) !important;
+  background-color: #f0f8ff !important;
+}
+
+.fc-event {
+  background: var(--fc-event-bg-color);
+}
+
+.dropdown-item {
+  cursor: pointer;
+}
