@@ -50,7 +50,7 @@ function appNotifySuccess(title, message, type = 'success', icon = "fa fa-bell")
     appNotify(title, message, type, icon);
 }
 
-function appNotifyDander(title, message, type = 'danger', icon = "fa fa-bug") {
+function appNotifyDanger(title, message, type = 'danger', icon = "fa fa-bug") {
     appNotify(title, message, type, icon);
 }
 
@@ -91,6 +91,11 @@ function eventCopy(days) {
     var date = new Date(selectedEvent.event.extendedProps.worklog.started);
     date.setDate(date.getDate() + days);
 
+    let message = '';
+    if (selectedEvent.event.extendedProps.worklog.comment.content[0] != undefined) {
+        message = selectedEvent.event.extendedProps.worklog.comment.content[0].content[0].text;
+    }
+
     date = addHoursToDate(date, 2);
 
     $.ajax({
@@ -100,7 +105,7 @@ function eventCopy(days) {
             'worklog_add_form_issue_key': selectedEvent.event.extendedProps.issue.key,
             'worklog_add_form_start': date.toISOString().substring(0, 10) + 'T' + date.toISOString().substring(11),
             'worklog_add_form_time_spent': selectedEvent.event.extendedProps.worklog.timeSpent,
-            'worklog_add_form_message': selectedEvent.event.extendedProps.worklog.comment.content[0].content[0].text,
+            'worklog_add_form_message': message,
         },
         success: function (response) {
             $('#addEventModal').modal('hide');
@@ -616,7 +621,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     // });
                 },
                 error: function () {
-                    appNotifyDander('Wystąpił błąd!', 'Wystąpił błąd podczas zapisu zdarzenia.');
+                    appNotifyDanger('Wystąpił błąd!', 'Wystąpił błąd podczas zapisu zdarzenia.');
                     // swal("Wystąpił błąd!", 'Wystąpił błąd podczas zapisu zdarzenia', {
                     //     icon: "error",
                     //     buttons: {
@@ -728,23 +733,10 @@ document.addEventListener('DOMContentLoaded', function () {
         var formData = $('#worklogFormAdd').serialize();
 
         if ($('#worklogFormAdd select[name="worklog_add_form_issue_key"]').val() == '') {
-            swal("Wystąpił błąd!", 'Musisz wybrać zadanie', {
-                icon: "error",
-                buttons: {
-                    confirm: {
-                        className: 'btn btn-danger'
-                    }
-                },
-            });
+            appNotifyDanger('Wystąpił błąd!', 'Musisz wybrać zadanie.');
         } else if (!validateTime($('#worklogFormAdd input[name="worklog_add_form_time_spent"]').val())) {
-            swal("Wystąpił błąd!", 'Nieporawny format daty.', {
-                icon: "error",
-                buttons: {
-                    confirm: {
-                        className: 'btn btn-danger'
-                    }
-                },
-            });
+
+            appNotifyDanger('Wystąpił błąd!', 'Nieporawny format daty.');
         } else {
             $.ajax({
                 url: '/worklogs/save-add',
@@ -757,20 +749,21 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 success: function (response) {
                     $('#addEventModal').modal('hide');
-                    swal({
-                        title: "Pomyślnie dodano czas pracy!",
-                        text: "Czas pracy został dodany!",
-                        icon: "success",
-                        buttons: {
-                            confirm: {
-                                text: "OK",
-                                value: true,
-                                visible: true,
-                                className: "btn btn-success",
-                                closeModal: true
-                            }
-                        }
-                    });
+                    appNotifySuccess('Pomyślnie dodano czas pracy!', 'Czas pracy został dodany!');
+                    // swal({
+                    //     title: "Pomyślnie dodano czas pracy!",
+                    //     text: "Czas pracy został dodany!",
+                    //     icon: "success",
+                    //     buttons: {
+                    //         confirm: {
+                    //             text: "OK",
+                    //             value: true,
+                    //             visible: true,
+                    //             className: "btn btn-success",
+                    //             closeModal: true
+                    //         }
+                    //     }
+                    // });
                     calendar.refetchEvents();
                 },
                 error: function (xhr, status, error) {
