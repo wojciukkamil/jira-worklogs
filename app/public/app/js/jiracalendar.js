@@ -1,6 +1,60 @@
 
 var selectedEvent = null;
 
+var polishHolidays = {};
+var holidaysRequestedYears = {};
+
+function loadPublicHolidaysForRange(calendar) {
+    var rangeStart = calendar.view.activeStart;
+    var rangeEnd = calendar.view.activeEnd;
+
+    for (var year = rangeStart.getFullYear(); year <= rangeEnd.getFullYear(); year++) {
+        if (holidaysRequestedYears[year]) {
+            continue;
+        }
+        holidaysRequestedYears[year] = true;
+        $.getJSON('https://date.nager.at/api/v3/PublicHolidays/' + year + '/PL')
+            .done(function (data) {
+                $.each(data, function (i, holiday) {
+                    polishHolidays[holiday.date] = holiday.localName || holiday.name;
+                });
+                markPublicHolidays();
+                updateWorklogSummary(calendar);
+            });
+    }
+}
+
+function markPublicHolidays() {
+    $('#calendar .fc-holiday').removeClass('fc-holiday').removeAttr('title');
+    $('#calendar .holiday-name').remove();
+
+    $.each(polishHolidays, function (date, name) {
+        var escapedName = $('<div/>').text(name).html();
+        var cells = $('#calendar [data-date="' + date + '"]');
+        cells.addClass('fc-holiday').attr('title', name);
+
+        cells.filter('.fc-day').each(function () {
+            var frame = $(this).find('.fc-daygrid-day-frame');
+            if (frame.length && frame.find('.holiday-name').length === 0) {
+                frame.append('<div class="holiday-name">' + escapedName + '</div>');
+            }
+        });
+
+        cells.filter('.fc-col-header-cell').each(function () {
+            if ($(this).find('.holiday-name').length === 0) {
+                $(this).append('<div class="holiday-name">' + escapedName + '</div>');
+            }
+        });
+
+        cells.filter('.fc-list-day').each(function () {
+            var side = $(this).find('.fc-list-day-side');
+            if (side.length && side.find('.holiday-name').length === 0) {
+                side.append('<span class="holiday-name">' + escapedName + '</span>');
+            }
+        });
+    });
+}
+
 function validateTime(str) {
     if (str == '' || str == null) {
         return false;
@@ -25,6 +79,54 @@ function validateTime(str) {
     }
 
     return true;
+}
+
+function formatMinutesToHours(totalMinutes) {
+    var hours = Math.floor(totalMinutes / 60);
+    var mins = totalMinutes % 60;
+
+    return hours + 'h' + (mins > 0 ? ' ' + mins + 'm' : '');
+}
+
+function updateWorklogSummary(calendar) {
+    var summaryEl = document.getElementById('worklog-summary');
+    if (!summaryEl) {
+        var toolbar = document.querySelector('#calendar .fc-header-toolbar');
+        if (!toolbar) {
+            return;
+        }
+        summaryEl = document.createElement('div');
+        summaryEl.id = 'worklog-summary';
+        toolbar.after(summaryEl);
+    }
+
+    var rangeStart = calendar.view.currentStart;
+    var rangeEnd = calendar.view.currentEnd;
+
+    var workingDays = 0;
+    for (var d = new Date(rangeStart); d < rangeEnd; d.setDate(d.getDate() + 1)) {
+        var day = d.getDay();
+        var dateStr = d.getFullYear() + '-'
+            + ('0' + (d.getMonth() + 1)).slice(-2) + '-'
+            + ('0' + d.getDate()).slice(-2);
+        if (day !== 0 && day !== 6 && !polishHolidays[dateStr]) {
+            workingDays++;
+        }
+    }
+    var requiredMinutes = workingDays * 8 * 60;
+
+    var workedMinutes = 0;
+    $.each(calendar.getEvents(), function (key, event) {
+        if (event.start && event.end && event.start >= rangeStart && event.start < rangeEnd) {
+            workedMinutes += Math.round(Math.abs(event.end - event.start) / (1000 * 60));
+        }
+    });
+
+    var matches = workedMinutes === requiredMinutes;
+    summaryEl.className = matches ? 'worklog-summary-ok' : 'worklog-summary-bad';
+    summaryEl.innerHTML = '<i class="fas ' + (matches ? 'fa-check-circle' : 'fa-exclamation-circle') + '"></i> '
+        + 'Czas pracy: <b>' + formatMinutesToHours(workedMinutes) + '</b>'
+        + ' / <b>' + formatMinutesToHours(requiredMinutes) + '</b>';
 }
 
 function appNotify(title, message, type = 'default', icon = "none") {
@@ -310,6 +412,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 let timeStr = hours + 'h ' + (mins > 0 ? mins + 'm' : '');
                 $(".header_summary_time_" + key).html(timeStr);
             });
+
+            updateWorklogSummary(calendar);
+        },
+        datesSet: function (info) {
+            loadPublicHolidaysForRange(calendar);
+            markPublicHolidays();
+            updateWorklogSummary(calendar);
         },
         select: function (info) {
             // alert('Selected: ' + info.startStr + ' to ' + info.endStr);

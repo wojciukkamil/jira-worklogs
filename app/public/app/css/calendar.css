@@ -1,13 +1,23 @@
-/* Kolor tła dla soboty */
-.fc-day-sat {
-  background-color: #f0f8ff;
-  color: #888a85;
+/* Weekendy - delikatny czerwony */
+.fc-day-sat,
+.fc-day-sun {
+  background-color: #fdeceb;
 }
 
-/* Kolor tła dla niedzieli */
-.fc-day-sun {
-  background-color: #f9f0ff;
-  color: red;
+/* Dni wolne od pracy (święta) - mocniejszy czerwony */
+.fc-holiday {
+  background-color: #f1aeb5 !important;
+}
+
+.holiday-name {
+  font-size: 10px;
+  font-weight: 700;
+  color: #842029;
+  text-align: center;
+  padding: 0 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .issue-item-avatar {
@@ -49,4 +59,30 @@ span.spent-time {
 
 .dropdown-item {
   cursor: pointer;
+}
+
+#worklog-summary {
+  width: fit-content;
+  margin-left: auto;
+  margin-top: 6px;
+  margin-bottom: 4px;
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+#worklog-summary.worklog-summary-ok {
+  color: #1e7e34;
+  border-color: #28a745;
+  background-color: #eafaf1;
+}
+
+#worklog-summary.worklog-summary-bad {
+  color: #bd2130;
+  border-color: #dc3545;
+  background-color: #fdf0f0;
 }
