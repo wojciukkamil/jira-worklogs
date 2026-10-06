@@ -34,7 +34,7 @@ docker compose up --build -d
 
 ### 2.4 Istalacja zależności
 
-Aby zainstalować pakiety wymagane do działania aplikacji należy wewnątrz kontenera `nginx_jira_worklogs` uruchomić:
+Aby zainstalować pakiety wymagane do działania aplikacji należy wewnątrz kontenera `nginx_jira_php` uruchomić:
 ```bash
 composer install
 ```
