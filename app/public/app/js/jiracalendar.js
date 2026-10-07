@@ -311,6 +311,105 @@ function forwardToJira() {
     window.open(url, '_blank')
 }
 
+function paramsToMinutes(timeStr) {
+  // Wyciągamy cyfry stojące przed 'h' oraz 'm'
+  const hoursMatch = timeStr.match(/(\d+)\s*h/);
+  const minutesMatch = timeStr.match(/(\d+)\s*m/);
+
+  // Jeśli dopasowanie istnieje, zamieniamy je na liczbę, w przeciwnym razie dajemy 0
+  const hours = hoursMatch ? parseInt(hoursMatch[1], 10) : 0;
+  const minutes = minutesMatch ? parseInt(minutesMatch[1], 10) : 0;
+
+  return (hours * 60) + minutes;
+}
+
+function exportCalendarToCSV(calendarInstance) {
+    const events = calendarInstance.getEvents();
+
+    if (events.length === 0) {
+        alert("Brak wydarzeń do wyeksportowania.");
+        return;
+    }
+
+    // 1. Definicja wymaganych nagłówków
+    const headers = [
+        "Klucz zgłoszenia",
+        "Projekt",
+        "Podsumowanie zgłoszenia",
+        "Data",
+        "Czas w minutach",
+        "Komentarz"
+    ];
+
+    let totalMinutes = 0;
+
+    // 2. Mapowanie wydarzeń na wiersze danych
+    const rows = events.map(event => {
+        // Pobieranie niestandardowych pól z extendedProps (lub przypisanie pustego ciągu)
+        const ticketKey = event.title || "";
+        const project = event.title.substring(0, event.title.indexOf('-')) || "";
+        const summary = event.extendedProps.issue.fields.summary || ""; // Zazwyczaj tytuł to podsumowanie
+
+        // Formatowanie daty (RRRR-MM-DD)
+        // const dateStr = event.start ? event.start : event.start.toISOString();
+        const startDateTmp = new Date(event.start);
+        const [day, month, year] = startDateTmp.toLocaleDateString().split('.');
+        // Add leading zeros if day or month is a single digit
+        const formattedDay = day.padStart(2, '0');
+        const formattedMonth = month.padStart(2, '0');
+
+        // Combine into yyyy-mm-dd
+        const dateStr = `${year}-${formattedMonth}-${formattedDay}`;
+        // Pobieranie czasu w minutach (z pola w extendedProps)
+        // const minutes = parseInt(event.worklog.timeSpentSeconds || 0, 10) / 60; // Zakładamy, że czas jest w sekundach i konwertujemy na minuty
+        const minutes = Math.abs(event.end - event.start) / (1000 * 60);
+        totalMinutes += minutes; // Dodawanie do sumy globalnej
+        console.log(event);
+        const comment = event.extendedProps.worklog.comment.content[0].content[0].text || "";
+
+        // Zwracanie wiersza (z zabezpieczeniem cudzysłowami dla pól tekstowych)
+        return [
+            `"${ticketKey.replace(/"/g, '""')}"`,
+            `"${project.replace(/"/g, '""')}"`,
+            `"${summary.replace(/"/g, '""')}"`,
+            dateStr,
+            minutes,
+            `"${comment.replace(/"/g, '""')}"`
+        ];
+    });
+
+    // 3. Kalkulacja godzin i minut do wiersza podsumowania
+    const summaryHours = Math.floor(totalMinutes / 60);
+    const summaryMinutes = totalMinutes % 60;
+    const summaryTimeStr = `${summaryHours} godz. ${summaryMinutes} min.`;
+
+    // 4. Tworzenie zawartości CSV (używamy średnika jako separatora)
+    const csvLines = [
+        headers.join(";"),
+        ...rows.map(row => row.join(";"))
+    ];
+
+    // 5. Dodanie wymaganego wiersza podsumowania na samym końcu
+    // Struktura dopasowana do kolumn: PODSUMOWANIE (kol. 1) ;; Suma czasu pracy: (kol. 3) ;; [minuty] (kol. 5) ; [tekst] (kol. 6)
+    csvLines.push(`PODSUMOWANIE;;Suma czasu pracy:;;${totalMinutes};${summaryTimeStr}`);
+
+    const csvContent = csvLines.join("\n");
+
+    // 6. Pobieranie pliku (z dodaniem BOM dla poprawnego kodowania polskich znaków w Excelu)
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `raport_czasu_pracy_${new Date().toISOString().slice(0,10)}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     var calendarEl = document.getElementById('calendar');
     var loadingEl = document.getElementById('loading');
@@ -328,7 +427,8 @@ document.addEventListener('DOMContentLoaded', function () {
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay,listMonth'
+            // right: 'dayGridMonth,timeGridWeek,timeGridDay,listMonth exportCsvBtn'
+            right: 'timeGridWeek,timeGridDay,listMonth exportCsvBtn'
         },
         firstDay: 1,
         weekNumbers: true,
@@ -352,6 +452,14 @@ document.addEventListener('DOMContentLoaded', function () {
             month: 'Miesiąc',
             day: 'Dzień',
             week: 'Tydzień'
+        },
+        customButtons: {
+            exportCsvBtn: {
+                text: 'Eksportuj do CSV',
+                click: function() {
+                    exportCalendarToCSV(calendar); // Wywołanie funkcji eksportu
+                }
+            }
         },
         // monthNames: ['Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec', 'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'],
         // monthNamesShort: ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paź', 'Lis', 'Gru'],
