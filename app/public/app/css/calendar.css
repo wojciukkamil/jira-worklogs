@@ -86,3 +86,27 @@ span.spent-time {
   border-color: #dc3545;
   background-color: #fdf0f0;
 }
+
+.fc-list-event-title, .fc-list-event-graphic, .fc-list-event-time {
+    color: white;
+    cursor: pointer;
+}
+
+.fc .fc-list-event-dot {
+  border: calc(var(--fc-list-event-dot-width)/2) solid #fff;
+  border-radius: calc(var(--fc-list-event-dot-width)/2);
+  box-sizing: content-box;
+  display: inline-block;
+  height: 0px;
+  width: 0px;
+}
+
+.fc .fc-list-event:hover td {
+  background-color: var(--fc-list-event-hover-bg-color);
+  color:black;
+}
+
+.fc .fc-list-event:hover .fc-list-event-dot {
+  border: calc(var(--fc-list-event-dot-width)/2) solid var(--fc-event-bg-color);
+}
+

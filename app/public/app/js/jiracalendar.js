@@ -306,9 +306,170 @@ function eventShow() {
     });
 }
 
+function generateReportShow(startDate, endDate) {
+
+    $.ajax({
+        url: "/report/show",
+        data: {
+            startDate: startDate.toISOString().substring(0, 10),
+            endDate: endDate.toISOString().substring(0, 10),
+        },
+        type: "POST",
+        success: function (response) {
+            $('#reportGenerateModal .modal-body').html(response);
+            $('#reportGenerateModal').modal('show');
+        },
+        error: function (response) {
+            console.log(response);
+            alert("Error preview worklog");
+        }
+    }).done(function () {
+        $(this).addClass("done");
+    });
+}
+
 function forwardToJira() {
     var url = 'https://tuzubezpieczenia.atlassian.net/browse/' + selectedEvent.event.extendedProps.issue.key;
     window.open(url, '_blank')
+}
+
+function paramsToMinutes(timeStr) {
+    // Wyciągamy cyfry stojące przed 'h' oraz 'm'
+    const hoursMatch = timeStr.match(/(\d+)\s*h/);
+    const minutesMatch = timeStr.match(/(\d+)\s*m/);
+
+    // Jeśli dopasowanie istnieje, zamieniamy je na liczbę, w przeciwnym razie dajemy 0
+    const hours = hoursMatch ? parseInt(hoursMatch[1], 10) : 0;
+    const minutes = minutesMatch ? parseInt(minutesMatch[1], 10) : 0;
+
+    return (hours * 60) + minutes;
+}
+
+function exportCalendarToCSV(calendarInstance) {
+
+    swal({
+        title: 'Czy chcesz wygenerować raport?',
+        text: "Raport zostanie wygenerowany jako plik CSV!",
+        type: 'warning',
+        buttons: {
+            cancel: {
+                visible: true,
+                text: 'Anuluj',
+                className: 'btn btn-danger'
+            },
+            confirm: {
+                text: 'Tak, usuwam',
+                className: 'btn btn-success'
+            }
+        }
+    }).then((willGenerateRaprt) => {
+        if (willGenerateRaprt) {
+            $.ajax({
+                url: '/worklogs/delete',
+                type: 'POST',
+                data: {
+                    'worklog_id': selectedEvent.event.extendedProps.worklog.id,
+                    'issue_key': selectedEvent.event.extendedProps.issue.key,
+                },
+                success: function (response) {
+                    $('#editEventModal').modal('hide');
+                    $('#confirmDelete').modal('hide');
+                    appNotifySuccess('Pomyślnie usunięto czas pracy!', 'Czas pracy został usunięty.');
+                    selectedEvent.view.calendar.refetchEvents();
+                },
+                error: function () {
+                    appNotifyDanger('Wystąpił Błąd !!!', 'Bład podczas generowania raportu.');
+                }
+            });
+
+        } else {
+            appNotifyInfo('Anulowano generowanie raportu!', 'Raport nie zostanie wygenerowany.');
+        }
+    });
+    const events = calendarInstance.getEvents();
+
+    if (events.length === 0) {
+        alert("Brak wydarzeń do wyeksportowania.");
+        return;
+    }
+
+    // 1. Definicja wymaganych nagłówków
+    const headers = [
+        "Klucz zgłoszenia",
+        "Projekt",
+        "Podsumowanie zgłoszenia",
+        "Data",
+        "Czas w minutach",
+        "Komentarz"
+    ];
+
+    let totalMinutes = 0;
+
+    // 2. Mapowanie wydarzeń na wiersze danych
+    const rows = events.map(event => {
+        // Pobieranie niestandardowych pól z extendedProps (lub przypisanie pustego ciągu)
+        const ticketKey = event.title || "";
+        const project = event.title.substring(0, event.title.indexOf('-')) || "";
+        const summary = event.extendedProps.issue.fields.summary || ""; // Zazwyczaj tytuł to podsumowanie
+
+        // Formatowanie daty (RRRR-MM-DD)
+        // const dateStr = event.start ? event.start : event.start.toISOString();
+        const startDateTmp = new Date(event.start);
+        const [day, month, year] = startDateTmp.toLocaleDateString().split('.');
+        // Add leading zeros if day or month is a single digit
+        const formattedDay = day.padStart(2, '0');
+        const formattedMonth = month.padStart(2, '0');
+
+        // Combine into yyyy-mm-dd
+        const dateStr = `${year}-${formattedMonth}-${formattedDay}`;
+        // Pobieranie czasu w minutach (z pola w extendedProps)
+        // const minutes = parseInt(event.worklog.timeSpentSeconds || 0, 10) / 60; // Zakładamy, że czas jest w sekundach i konwertujemy na minuty
+        const minutes = Math.abs(event.end - event.start) / (1000 * 60);
+        totalMinutes += minutes; // Dodawanie do sumy globalnej
+        console.log(event);
+        const comment = event.extendedProps.worklog.comment.content[0].content[0].text || "";
+
+        // Zwracanie wiersza (z zabezpieczeniem cudzysłowami dla pól tekstowych)
+        return [
+            `"${ticketKey.replace(/"/g, '""')}"`,
+            `"${project.replace(/"/g, '""')}"`,
+            `"${summary.replace(/"/g, '""')}"`,
+            dateStr,
+            minutes,
+            `"${comment.replace(/"/g, '""')}"`
+        ];
+    });
+
+    // 3. Kalkulacja godzin i minut do wiersza podsumowania
+    const summaryHours = Math.floor(totalMinutes / 60);
+    const summaryMinutes = totalMinutes % 60;
+    const summaryTimeStr = `${summaryHours} godz. ${summaryMinutes} min.`;
+
+    // 4. Tworzenie zawartości CSV (używamy średnika jako separatora)
+    const csvLines = [
+        headers.join(";"),
+        ...rows.map(row => row.join(";"))
+    ];
+
+    // 5. Dodanie wymaganego wiersza podsumowania na samym końcu
+    // Struktura dopasowana do kolumn: PODSUMOWANIE (kol. 1) ;; Suma czasu pracy: (kol. 3) ;; [minuty] (kol. 5) ; [tekst] (kol. 6)
+    csvLines.push(`PODSUMOWANIE;;Suma czasu pracy:;;${totalMinutes};${summaryTimeStr}`);
+
+    const csvContent = csvLines.join("\n");
+
+    // 6. Pobieranie pliku (z dodaniem BOM dla poprawnego kodowania polskich znaków w Excelu)
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `raport_czasu_pracy_${new Date().toISOString().slice(0, 10)}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -328,12 +489,13 @@ document.addEventListener('DOMContentLoaded', function () {
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay,listMonth'
+            // right: 'dayGridMonth,timeGridWeek,timeGridDay,listMonth exportCsvBtn'
+            right: 'timeGridWeek,timeGridDay,listMonth exportCsvBtn'
         },
         firstDay: 1,
         weekNumbers: true,
         dayMaxEvents: true,
-        slotMinTime: "07:00:00",
+        slotMinTime: "06:00:00",
         slotMaxTime: "18:00:00",
         contentHeight: 'auto',
         // events: [                       // Przykładowe wydarzenia
@@ -352,6 +514,19 @@ document.addEventListener('DOMContentLoaded', function () {
             month: 'Miesiąc',
             day: 'Dzień',
             week: 'Tydzień'
+        },
+        customButtons: {
+            exportCsvBtn: {
+                text: 'Generuj raport',
+                click: function () {
+                    let currentView = calendar.view;
+
+                    let startDate = currentView.activeStart; // Obiekt Date (początek widoku)
+                    let endDate = currentView.activeEnd;     // Obiekt Date (koniec widoku)
+
+                    generateReportShow(startDate, endDate);
+                }
+            }
         },
         // monthNames: ['Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec', 'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień'],
         // monthNamesShort: ['Sty', 'Lut', 'Mar', 'Kwi', 'Maj', 'Cze', 'Lip', 'Sie', 'Wrz', 'Paź', 'Lis', 'Gru'],
@@ -453,20 +628,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 type: "POST",
                 success: function (response) {
-                    // swal({
-                    //     title: "Pomyślnie przeniesiono event!",
-                    //     text: "Event został przeniesiony!",
-                    //     icon: "success",
-                    //     buttons: {
-                    //         confirm: {
-                    //             text: "OK",
-                    //             value: true,
-                    //             visible: true,
-                    //             className: "btn btn-success",
-                    //             closeModal: true
-                    //         }
-                    //     }
-                    // });
                     appNotifySuccess('Pomyślnie przeniesiono event!', 'Event został przeniesiony.');
                     info.view.calendar.refetchEvents();
 
@@ -479,7 +640,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         },
         eventResize: function (info) {
-            // console.log(info.event);
+
             $.ajax({
                 url: "/worklogs/update",
                 data: {
@@ -490,20 +651,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 type: "POST",
                 success: function (response) {
-                    // swal({
-                    //     title: "Pomyślnie zaktualizowano czas pracy!",
-                    //     text: "Czas pracy został zaktualizowany!",
-                    //     icon: "success",
-                    //     buttons: {
-                    //         confirm: {
-                    //             text: "OK",
-                    //             value: true,
-                    //             visible: true,
-                    //             className: "btn btn-success",
-                    //             closeModal: true
-                    //         }
-                    //     }
-                    // });
+
                     appNotifySuccess('Pomyślnie zaktualizowano czas pracy!', 'Czas pracy został zaktualizowany.');
                     info.view.calendar.refetchEvents();
                 },
@@ -560,25 +708,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 $(this).addClass("done");
             });
         },
-        // Odpala się po kliknięciu w wydarzenie
-        // eventClick: function(calEvent, jsEvent, view) {
-        //     selectedEvent = calEvent; // Zapisujemy kliknięte wydarzenie
-
-        //     // Wyświetlamy menu w miejscu kliknięcia myszką
-        //     $('#action-menu')
-        //         .css({
-        //             top: jsEvent.pageY + 10,
-        //             left: jsEvent.pageX + 10
-        //         })
-        //         .show();
-
-        //     // Zatrzymujemy propagację, żeby nie wywoływać innych zdarzeń
-        //     return false;
-        // },
-        // Ukrywamy menu po kliknięciu gdziekolwiek indziej
-        // dayClick: function() {
-        //     $('#action-menu').hide();
-        // }
     });
 
     calendar.render();
@@ -617,19 +746,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 </ul>
                 `;
             document.body.appendChild(menu);
-            // <ul class="dropdown-menu" role="menu" style="">
-            // 								<li>
-            // 									<a class="dropdown-item" href="#">Action</a>
-            // 									<a class="dropdown-item" href="#">Another action</a>
-            // 									<div class="dropdown-divider"></div>
-            // 									<a class="dropdown-item" href="#">Something else here</a>
-            // 								</li>
-            // 							</ul>
-            //   <ul style="list-style: none; margin: 0; padding: 10px;">
-            //     <li id="menu-edit" style="padding: 5px 10px; cursor: pointer;">Edit Event</li>
-            //     <li id="menu-delete" style="padding: 5px 10px; cursor: pointer; color: red;">Delete Event</li>
-            //   </ul>
-
             // Event listener for menu items
             menu.addEventListener('click', function (e) {
                 if (e.target.id === 'menu-edit') {
@@ -691,20 +807,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 success: function (response) {
                     $('#editEventModal').modal('hide');
-                    // swal({
-                    //     title: "Pomyślnie zapisano zmiany!",
-                    //     text: "Event został zaktualizowany!",
-                    //     icon: "success",
-                    //     buttons: {
-                    //         confirm: {
-                    //             text: "OK",
-                    //             value: true,
-                    //             visible: true,
-                    //             className: "btn btn-success",
-                    //             closeModal: true
-                    //         }
-                    //     }
-                    // });
 
                     calendar.refetchEvents();
 
@@ -712,33 +814,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     appNotifySuccess('Pomyślnie zapisano zmiany!', 'Czas pracy został zaktualizowany.');
 
-
-
-
-
-                    //                       $.notify({
-                    // 	icon: 'fa fa-bell',
-                    // 	title: 'Kaiadmin zaktalizowano',
-                    // 	message: 'Premium Bootstrap 5 Admin Dashboard',
-                    // },{
-                    // 	type: 'success',
-                    // 	placement: {
-                    // 		from: "top",
-                    // 		align: "right"
-                    // 	},
-                    // 	// time: 3000,
-                    // });
                 },
                 error: function () {
                     appNotifyDanger('Wystąpił błąd!', 'Wystąpił błąd podczas zapisu zdarzenia.');
-                    // swal("Wystąpił błąd!", 'Wystąpił błąd podczas zapisu zdarzenia', {
-                    //     icon: "error",
-                    //     buttons: {
-                    //         confirm: {
-                    //             className: 'btn btn-danger'
-                    //         }
-                    //     },
-                    // });
                 }
             });
         }
@@ -773,20 +851,6 @@ document.addEventListener('DOMContentLoaded', function () {
                         $('#editEventModal').modal('hide');
                         $('#confirmDelete').modal('hide');
                         appNotifySuccess('Pomyślnie usunięto czas pracy!', 'Czas pracy został usunięty.');
-                        // swal({
-                        //     title: "Pomyślnie usunięto event!",
-                        //     text: "Czas pracy został usunięty!",
-                        //     icon: "success",
-                        //     buttons: {
-                        //         confirm: {
-                        //             text: "OK",
-                        //             value: true,
-                        //             visible: true,
-                        //             className: "btn btn-success",
-                        //             closeModal: true
-                        //         }
-                        //     }
-                        // });
                         calendar.refetchEvents();
                     },
                     error: function () {
@@ -796,13 +860,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             } else {
                 appNotifyInfo('Anulowano usunięcie czasu pracy!', 'Czas pracy nie został usunięty.');
-                // swal("Anulowano usunięcie czasu pracy", {
-                //     buttons: {
-                //         confirm: {
-                //             className: 'btn btn-success'
-                //         }
-                //     }
-                // });
+
             }
         });
 
@@ -859,20 +917,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 success: function (response) {
                     $('#addEventModal').modal('hide');
                     appNotifySuccess('Pomyślnie dodano czas pracy!', 'Czas pracy został dodany!');
-                    // swal({
-                    //     title: "Pomyślnie dodano czas pracy!",
-                    //     text: "Czas pracy został dodany!",
-                    //     icon: "success",
-                    //     buttons: {
-                    //         confirm: {
-                    //             text: "OK",
-                    //             value: true,
-                    //             visible: true,
-                    //             className: "btn btn-success",
-                    //             closeModal: true
-                    //         }
-                    //     }
-                    // });
                     calendar.refetchEvents();
                 },
                 error: function (xhr, status, error) {
@@ -888,6 +932,27 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
     });
+
+    $('#raportGenerateSubmitButton').on('click', function () {
+        var formData = $('#raportGenerateForm').serialize();
+        $.ajax({
+            url: '/report/prepare',
+            type: 'POST',
+            data: {
+                'startDate': $('#reportGenerateForm input[name="startDate"]').val(),
+                'endDate': $('#reportGenerateForm input[name="endDate"]').val()
+            },
+            success: function (response) {
+                $('#reportGenerateModal').modal('hide');
+                window.open(response.url, '_blank');
+                appNotifySuccess('Pomyślnie wygenerowano raport!', 'Raport został wygenerowany!');
+            },
+            error: function (xhr, status, error) {
+                console.error('Wystąpił problem:', error);
+                appNotifyDanger('Błąd generowania raportu !!!', 'Raport nie został wygenerowany!');
+            }
+        });
+    })
 
 });
 
