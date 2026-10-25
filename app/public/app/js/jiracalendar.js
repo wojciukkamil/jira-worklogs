@@ -4,6 +4,23 @@ var selectedEvent = null;
 var polishHolidays = {};
 var holidaysRequestedYears = {};
 
+/**
+ * Konwertuje datę na format YYYY-MM-DDTHH:mm w strefie Europe/Warsaw
+ * @param {Date|string|number} date - Obiekt daty, timestamp lub string
+ * @returns {string} Sformatowana data (np. "2026-10-25T07:36")
+ */
+function formatToWarsawTime(date = new Date()) {
+    const d = Object.fromEntries(
+        new Intl.DateTimeFormat('pl-PL', {
+            timeZone: 'Europe/Warsaw',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', hour12: false
+        }).formatToParts(new Date(date)).map(p => [p.type, p.value])
+    );
+
+    return `${d.year}-${d.month}-${d.day}T${d.hour}:${d.minute}`;
+}
+
 function loadPublicHolidaysForRange(calendar) {
     var rangeStart = calendar.view.activeStart;
     var rangeEnd = calendar.view.activeEnd;
@@ -198,14 +215,12 @@ function eventCopy(days) {
         message = selectedEvent.event.extendedProps.worklog.comment.content[0].content[0].text;
     }
 
-    date = addHoursToDate(date, 2);
-
     $.ajax({
         url: '/worklogs/save-add',
         type: 'POST',
         data: {
             'worklog_add_form_issue_key': selectedEvent.event.extendedProps.issue.key,
-            'worklog_add_form_start': date.toISOString().substring(0, 10) + 'T' + date.toISOString().substring(11),
+            'worklog_add_form_start': formatToWarsawTime(date),
             'worklog_add_form_time_spent': selectedEvent.event.extendedProps.worklog.timeSpent,
             'worklog_add_form_message': message,
         },
@@ -426,7 +441,7 @@ function exportCalendarToCSV(calendarInstance) {
         // const minutes = parseInt(event.worklog.timeSpentSeconds || 0, 10) / 60; // Zakładamy, że czas jest w sekundach i konwertujemy na minuty
         const minutes = Math.abs(event.end - event.start) / (1000 * 60);
         totalMinutes += minutes; // Dodawanie do sumy globalnej
-        console.log(event);
+
         const comment = event.extendedProps.worklog.comment.content[0].content[0].text || "";
 
         // Zwracanie wiersza (z zabezpieczeniem cudzysłowami dla pól tekstowych)
@@ -479,7 +494,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'timeGridWeek',    // Widok miesiąca
         allDaySlot: false,
-        timeZone: 'Europe/Warsaw',
+        // timeZone: 'Europe/Warsaw',
+        timeZone: 'local', // Ustawienie strefy czasowej na lokalną
         locale: 'pl',
         themeSystem: 'bootstrap5',
         editable: true,
@@ -548,37 +564,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.querySelector('.loader-overlay').style.display = 'none';
             }
         },
-        dayHeaderDidMount: function (arg) {
-            // Pobierz datę dla nagłówka
-            const dateStr = arg.date.toISOString().split('T')[0]; // YYYY-MM-DD
-            const htmlContent = '<div>' + arg.text + '</div>' +
+        dayHeaderDidMount: function (info) {
+            const dateStr = formatToWarsawTime(info.date).substring(0, 10)
+            const htmlContent = '<div>' + info.text + '</div>' +
                 '<div class="header_summary_time header_summary_time_' + dateStr + '" style="font-weight:normal; font-size:10px; color:green;">' +
                 '---' +
                 '</div>';
-            arg.el.innerHTML = htmlContent;
+            info.el.innerHTML = htmlContent;
         },
         eventsSet: function (info) {
             $(".header_summary_time").html('---');
             let events = calendar.getEvents();
-            // console.log('Events in view sssssssssssssss: ', events);
-            // let element = document.querySelector('.fc-col-header-cell [data-date="2026-04-24"]');
-            // let element = $(".header_summary_time_2026-04-24");
-            //             console.log('Header element for 2026-04-24: ', element);
             let days = [];
             let times = {};
             $.each(events, function (key, event) {
-                // here you can access all the properties just by typing either value.propertyName or value["propertyName"]
-                // example: value.ri_idx; value.ri_startDate; value.ri_endDate;
                 days.push(event.start.toISOString().substring(0, 10));
-                // console.log('Event time spent: ', event.extendedProps.timeInterval);
-
                 if (event.start && event.end) {
                     let diff = Math.abs(event.end - event.start) / (1000 * 60);
                     times[event.start.toISOString().substring(0, 10)] = (times[event.start.toISOString().substring(0, 10)] || 0) + diff;
                 }
             });
-            // console.log('days: ', days);
-            // console.log('times: ', times);
 
 
             $.each(times, function (key, dayTime) {
@@ -596,7 +601,6 @@ document.addEventListener('DOMContentLoaded', function () {
             updateWorklogSummary(calendar);
         },
         select: function (info) {
-            // alert('Selected: ' + info.startStr + ' to ' + info.endStr);
             $.ajax({
                 url: "/worklogs/add",
                 data: {
@@ -621,8 +625,8 @@ document.addEventListener('DOMContentLoaded', function () {
             $.ajax({
                 url: "/worklogs/update",
                 data: {
-                    'worklog_started': info.event.start.toISOString(),
-                    'worklog_ended': info.event.end.toISOString(),
+                    worklog_started: formatToWarsawTime(new Date(info.event.start)),
+                    worklog_ended: formatToWarsawTime(new Date(info.event.end)),
                     'worklog': info.event.extendedProps.worklog,
                     'issue': info.event.extendedProps.issue,
                 },
@@ -644,8 +648,8 @@ document.addEventListener('DOMContentLoaded', function () {
             $.ajax({
                 url: "/worklogs/update",
                 data: {
-                    worklog_started: info.event.start.toISOString(),
-                    worklog_ended: info.event.end.toISOString(),
+                    worklog_started: formatToWarsawTime(new Date(info.event.start)),
+                    worklog_ended: formatToWarsawTime(new Date(info.event.end)),
                     worklog: info.event.extendedProps.worklog,
                     issue: info.event.extendedProps.issue,
                 },
@@ -701,7 +705,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 },
                 error: function (response) {
-                    console.log(response);
                     alert("Error updating worklog");
                 }
             }).done(function () {
@@ -713,8 +716,6 @@ document.addEventListener('DOMContentLoaded', function () {
     calendar.render();
 
     function showCustomMenu(x, y, info) {
-        // console.log(info.el.style('ba'));
-
         if (selectedEvent) {
             selectedEvent.el.style.backgroundColor = '';
         }

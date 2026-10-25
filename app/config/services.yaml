@@ -11,7 +11,7 @@ parameters:
     app.jira_api_url: "%env(JIRA_API_URL)%"
     app.jira_auth_email: "%env(JIRA_AUTH_EMAIL)%"
     app.jira_auth_token: "%env(JIRA_AUTH_TOKEN)%"
-    timezone: '%env(APP_TIMEZONE)%'
+    app.timezone: '%env(APP_TIMEZONE)%'
 
 services:
     # default configuration for services in *this* file

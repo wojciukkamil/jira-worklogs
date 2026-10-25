@@ -28,8 +28,8 @@ class WorklogsController extends AbstractController
         Request $request
     ): JsonResponse {
         $requestData = $request->request->all();
-        $startDate = (new DateTime($requestData['worklog_started']))->setTimezone(new DateTimeZone('UTC'))->modify('-2 hours');
-        $endDate = (new DateTime($requestData['worklog_ended']))->setTimezone(new DateTimeZone('UTC'))->modify('-2 hours');
+        $startDate = (new DateTime($requestData['worklog_started']));
+        $endDate = (new DateTime($requestData['worklog_ended']));
         $result = $this->apiClient
             ->setRequestMethod('PUT')
             ->setMethodName('issue/:issue/worklog/:worklog?adjustEstimate=AUTO')
@@ -110,7 +110,7 @@ class WorklogsController extends AbstractController
     public function save(Request $request): Response
     {
         $requestData = $request->request->all();
-        $startDate = (new DateTime($requestData['worklog_form_start']))->setTimezone(new DateTimeZone('UTC'))->modify('-2 hours');
+        $startDate = (new DateTime($requestData['worklog_form_start']));
 
         $result = $this->apiClient
             ->setRequestMethod('PUT')
@@ -204,7 +204,8 @@ class WorklogsController extends AbstractController
         }
 
         $requestData = $request->request->all();
-        $startDate = (new DateTime($requestData['worklog_add_form_start']))->setTimezone(new DateTimeZone('UTC'))->modify('-2 hours');
+        $startDate = (new DateTime($requestData['worklog_add_form_start']));
+
         $result = $this->apiClient
             ->setRequestMethod('POST')
             ->setMethodName('issue/:issue/worklog/')
